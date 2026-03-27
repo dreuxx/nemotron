@@ -327,7 +327,8 @@ function logprobColor(lp) {
     return `rgb(${r}, ${g}, ${b})`;
 }
 
-const BYTE_RE = /^<0x([0-9A-Fa-f]{2})>$/;
+const BYTE_RE = /^(<0x[0-9A-Fa-f]{2}>)+$/;
+const BYTE_EXTRACT = /<0x([0-9A-Fa-f]{2})>/g;
 
 function decodeAllTokens(tokens) {
     const result = new Array(tokens.length).fill('');
@@ -345,18 +346,17 @@ function decodeAllTokens(tokens) {
             i++;
             continue;
         }
-        const m = BYTE_RE.exec(s);
-        if (m) {
+        if (BYTE_RE.test(s)) {
             const start = i;
             const bytes = [];
             while (i < tokens.length) {
                 const t2 = tokens[i].token_id;
                 if (t2 === null || t2 === undefined) break;
                 const s2 = vocab[String(t2)];
-                if (!s2) break;
-                const m2 = BYTE_RE.exec(s2);
-                if (!m2) break;
-                bytes.push(parseInt(m2[1], 16));
+                if (!s2 || !BYTE_RE.test(s2)) break;
+                for (const bm of s2.matchAll(BYTE_EXTRACT)) {
+                    bytes.push(parseInt(bm[1], 16));
+                }
                 i++;
             }
             result[start] = new TextDecoder('utf-8', {fatal: false}).decode(new Uint8Array(bytes));
@@ -371,8 +371,15 @@ function decodeAllTokens(tokens) {
 async function loadVocab() {
     if (vocab) return;
     try {
-        const resp = await fetch('vocab.json?_=' + Date.now());
-        if (resp.ok) vocab = await resp.json();
+        const resp = await fetch('vocab.jsonl?_=' + Date.now());
+        if (!resp.ok) return;
+        const text = await resp.text();
+        vocab = {};
+        for (const line of text.split('\n')) {
+            if (!line.trim()) continue;
+            const entry = JSON.parse(line);
+            vocab[String(entry.token_id)] = entry.token;
+        }
     } catch (e) { /* vocab unavailable */ }
 }
 
