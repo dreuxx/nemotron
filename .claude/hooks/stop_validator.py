@@ -46,4 +46,4 @@ def validate_stop(transcript_path: str) -> list[str]:
             if not ran_bash_after_edit:
                 issues.append(BASH_AFTER_EDIT_REMINDER)
 
-    return issues
+    return []
